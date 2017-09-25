@@ -45,19 +45,23 @@ Puppet::Type.type(:mount).provide(:windows_smb, :parent => Puppet::Provider) do
     end
 
     output = execute(cmd)
-    Puppet.debug(output)
+    # Puppet.debug(output)
     create_stub_file
+    output
   end
 
   def create_stub_file
-    if File.file?(stub_file_path)
-      Puppet.debug("Found stub file for mount: #{stub_file_path}")
+    drive_letter = resource[:name]
+    s = "#{drive_letter}/.stub"
+
+    if File.file?(s)
+      Puppet.debug("Found stub file for mount: #{s}")
     else
-      Puppet.debug("Could not find stub file for mount, creating: #{stub_file_path}")
+      Puppet.debug("Could not find stub file for mount, creating: #{s}")
       begin
-        File.write(stub_file_path, "")
+        File.write(s, "")
       rescue
-        Puppet::Util::Warnings.debug_once "Error writing to stub_file #{stub_file_path}, might be a permissions issue."
+        Puppet::Util::Warnings.debug_once "Error writing to stub_file #{s}, might be a permissions issue."
       end
     end
   end
@@ -102,7 +106,8 @@ Puppet::Type.type(:mount).provide(:windows_smb, :parent => Puppet::Provider) do
     end
 
     mounts.each { |mount|
-      s = self.class.stub_file_path(mount['Name'])
+      drive_letter = mount['Name']
+      s = "#{drive_letter}/.stub"
 
       if File.file?(s)
         Puppet.debug("Found stub file for mount: #{s}")
@@ -128,14 +133,6 @@ Puppet::Type.type(:mount).provide(:windows_smb, :parent => Puppet::Provider) do
     }.collect { |h|
       new(h)
     }
-  end
-
-  def stub_file_path(drive_letter="")
-    if drive_letter == ""
-      drive_letter = resource[:name]
-    end
-
-    "#{drive_letter}/.stub"
   end
 
   def to_unc(path)
