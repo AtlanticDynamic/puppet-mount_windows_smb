@@ -37,10 +37,16 @@ Puppet::Type.type(:mount).provide(:windows_smb, :parent => Puppet::Provider) do
 
     unc_path = to_unc(resource[:device])
     cmd = ["net", "use", resource[:name], unc_path]
+
+    if opts_json.has_key?('persistent')
+      cmd << "/persistent:#{opts_json['persistent']}"
+    end
+
     if opts_json.has_key?('user')
       cmd << "/user:#{to_unc(opts_json['user'])}"
       if opts_json.has_key?('password')
         cmd << "#{opts_json['password']}"
+        cmd << "/savecred"
       end
     end
 
@@ -55,13 +61,13 @@ Puppet::Type.type(:mount).provide(:windows_smb, :parent => Puppet::Provider) do
     s = "#{drive_letter}/.stub"
 
     if File.file?(s)
-      Puppet.debug("Found stub file for mount: #{s}")
+      Puppet.debug("Found existing stub file #{s}, not creating one")
     else
-      Puppet.debug("Could not find stub file for mount, creating: #{s}")
+      Puppet.debug("Could not find stub file #{s}, creating one now")
       begin
         File.write(s, "")
       rescue
-        Puppet::Util::Warnings.debug_once "Error writing to stub_file #{s}, might be a permissions issue."
+        Puppet::Util::Warnings.debug_once "Error writing to stub_file #{s}, this might be caused by a permissions issue."
       end
     end
   end
@@ -119,6 +125,11 @@ Puppet::Type.type(:mount).provide(:windows_smb, :parent => Puppet::Provider) do
 
       mount["Status"] = status
     }
+
+    if mount["ProviderName"].nil? || mount["ProviderName"] == ""
+      # if a drive is disconnected, the providerName may be nil
+      mount['Status'] = "Unavailable"
+    end
 
     mounts.map { |mount|
       {
